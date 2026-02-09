@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCN vs CNN Architecture Explained</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .tab-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            color: #fff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Section Card */
+        .section-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .icon {
+            font-size: 1.8rem;
+        }
+
+        /* Building Analogy */
+        .building-container {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            flex-wrap: wrap;
+            margin: 30px 0;
+        }
+
+        .building {
+            text-align: center;
+        }
+
+        .building-visual {
+            width: 200px;
+            height: 300px;
+            position: relative;
+            margin: 0 auto 20px;
+        }
+
+        /* Steel Frame (Backbone) */
+        .steel-frame {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 10px;
+        }
+
+        .steel-beam {
+            height: 8px;
+            background: linear-gradient(90deg, #666, #999, #666);
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .steel-beam::before,
+        .steel-beam::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 40px;
+            background: linear-gradient(180deg, #666, #999, #666);
+            border-radius: 4px;
+        }
+
+        .steel-beam::before { left: 20px; top: -16px; }
+        .steel-beam::after { right: 20px; top: -16px; }
+
+        /* Complete Building */
+        .complete-building {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #4a90a4 0%, #2d5a6b 100%);
+            border-radius: 10px 10px 0 0;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .complete-building.show {
+            opacity: 1;
+        }
+
+        .floor {
+            flex: 1;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 5px;
+        }
+
+        .window {
+            width: 25px;
+            height: 20px;
+            background: rgba(255,255,200,0.8);
+            border-radius: 3px;
+        }
+
+        .building-label {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+
+        .building-desc {
+            color: #aaa;
+            font-size: 0.9rem;
+            max-width: 200px;
+        }
+
+        /* Toggle Button */
+        .toggle-btn {
+            display: block;
+            margin: 20px auto;
+            padding: 12px 30px;
+            background: linear-gradient(90deg, #f093fb, #f5576c);
+            border: none;
+            border-radius: 25px;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .toggle-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(240, 147, 251, 0.3);
+        }
+
+        /* Network Diagrams */
+        .network-diagram {
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .network-flow {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 15px;
+            min-width: max-content;
+            padding: 20px 0;
+        }
+
+        .network-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .block-visual {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 15px;
+            border-radius: 10px;
+            min-width: 80px;
+            transition: all 0.3s ease;
+        }
+
+        .block-visual:hover {
+            transform: scale(1.05);
+        }
+
+        .block-visual.input {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .block-visual.backbone {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            min-width: 200px;
+        }
+
+        .block-visual.conv {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+        }
+
+        .block-visual.fc {
+            background: linear-gradient(135deg, #fa709a, #fee140);
+        }
+
+        .block-visual.output-class {
+            background: linear-gradient(135deg, #a8edea, #fed6e3);
+            color: #333;
+        }
+
+        .block-visual.output-seg {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+        }
+
+        .layer-row {
+            display: flex;
+            gap: 2px;
+            justify-content: center;
+        }
+
+        .layer-unit {
+            width: 8px;
+            height: 8px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 2px;
+        }
+
+        .block-label {
+            font-size: 0.75rem;
+            color: #ccc;
+            text-align: center;
+            max-width: 100px;
+        }
+
+        .block-size {
+            font-size: 0.65rem;
+            color: #888;
+            font-family: monospace;
+        }
+
+        .arrow {
+            font-size: 1.5rem;
+            color: #666;
+        }
+
+        /* Comparison */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .comparison-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .comparison-card.cnn {
+            border-color: rgba(250, 112, 154, 0.5);
+        }
+
+        .comparison-card.fcn {
+            border-color: rgba(17, 153, 142, 0.5);
+        }
+
+        .comparison-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .comparison-card.cnn h3 {
+            color: #fa709a;
+        }
+
+        .comparison-card.fcn h3 {
+            color: #38ef7d;
+        }
+
+        .comparison-list {
+            list-style: none;
+        }
+
+        .comparison-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .comparison-list li:last-child {
+            border-bottom: none;
+        }
+
+        .comparison-list .icon {
+            font-size: 1.2rem;
+        }
+
+        /* Output Visualization */
+        .output-viz {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            margin: 30px 0;
+        }
+
+        .output-example {
+            text-align: center;
+        }
+
+        .output-img {
+            width: 150px;
+            height: 150px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .output-img.original {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+        }
+
+        .output-img.original::before {
+            content: '🐦';
+            font-size: 4rem;
+        }
+
+        .output-img.classification {
+            background: linear-gradient(135deg, #fd79a8, #e84393);
+            flex-direction: column;
+        }
+
+        .output-img.segmentation {
+            background: #000;
+        }
+
+        .seg-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            width: 100%;
+            height: 100%;
+        }
+
+        .seg-cell {
+            transition: background 0.3s ease;
+        }
+
+        .output-label {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .output-desc {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        /* Key Points */
+        .key-point {
+            background: linear-gradient(90deg, rgba(0,212,255,0.1), rgba(123,44,191,0.1));
+            border-left: 4px solid #00d4ff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .key-point h4 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        /* Animation for segmentation */
+        @keyframes fillSeg {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .animate-seg .seg-cell {
+            animation: fillSeg 0.5s ease forwards;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 FCN vs CNN Architecture Explained</h1>
+        <p class="subtitle">Understanding Backbone, Fully Connected vs Fully Convolutional Layers</p>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('backbone')">🏗️ Backbone Concept</button>
+            <button class="tab-btn" onclick="switchTab('architecture')">🔧 Architecture Comparison</button>
+            <button class="tab-btn" onclick="switchTab('output')">📊 Output Difference</button>
+        </div>
+
+        <!-- Tab 1: Backbone Concept -->
+        <div id="backbone" class="tab-content active">
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🏗️</span> What is a Backbone?</h2>
+                
+                <div class="building-container">
+                    <div class="building">
+                        <div class="building-visual">
+                            <div class="steel-frame" id="steelFrame">
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                            </div>
+                            <div class="complete-building" id="completeBuilding">
+                                <div class="floor"><div class="window"></div><div class="window"></div><div class="window"></div></div>
+                                <div class="floor"><div class="window"></div><div class="window"></div><div class="window"></div></div>
+                                <div class="floor"><div class="window"></div><div class="window"></div><div class="window"></div></div>
+                                <div class="floor"><div class="window"></div><div class="window"></div><div class="window"></div></div>
+                                <div class="floor"><div class="window"></div><div class="window"></div><div class="window"></div></div>
+                                <div class="floor"><div class="window"></div><div class="window"></div><div class="window"></div></div>
+                            </div>
+                        </div>
+                        <div class="building-label">Building = Complete Model</div>
+                        <div class="building-desc">The entire building is like a complete neural network model</div>
+                    </div>
+
+                    <div class="building">
+                        <div class="building-visual">
+                            <div class="steel-frame">
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                                <div class="steel-beam"></div>
+                            </div>
+                        </div>
+                        <div class="building-label">Steel Frame = Backbone</div>
+                        <div class="building-desc">ResNet-101 is the backbone that extracts features</div>
+                    </div>
+                </div>
+
+                <button class="toggle-btn" onclick="toggleBuilding()">
+                    🔄 Toggle View: Steel Frame ↔ Complete Building
+                </button>
+
+                <div class="key-point">
+                    <h4>💡 Key Concept</h4>
+                    <p><strong>Backbone</strong> is like the steel frame of a building — it's the core structure of the model.</p>
+                    <p style="margin-top: 10px;">• <strong>ResNet-101</strong> = A 101-layer deep residual network that "extracts features" from images</p>
+                    <p>• <strong>FCN</strong> = The architecture that tells you how to use these features for "pixel-level classification"</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Architecture Comparison -->
+        <div id="architecture" class="tab-content">
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🔴</span> Traditional CNN (Image Classification)</h2>
+                <div class="network-diagram">
+                    <div class="network-flow">
+                        <div class="network-block">
+                            <div class="block-visual input">
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                            </div>
+                            <span class="block-label">Input Image</span>
+                            <span class="block-size">[224×224×3]</span>
+                        </div>
+
+                        <span class="arrow">→</span>
+
+                        <div class="network-block">
+                            <div class="block-visual backbone">
+                                <div style="text-align: center; color: #fff; font-weight: bold;">
+                                    ResNet-101<br>
+                                    <small>(101 Conv Layers)</small>
+                                </div>
+                            </div>
+                            <span class="block-label">Backbone</span>
+                            <span class="block-size">Feature Extraction</span>
+                        </div>
+
+                        <span class="arrow">→</span>
+
+                        <div class="network-block">
+                            <div class="block-visual conv">
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                            </div>
+                            <span class="block-label">Feature Map</span>
+                            <span class="block-size">[7×7×2048]</span>
+                        </div>
+
+                        <span class="arrow">→</span>
+
+                        <div class="network-block">
+                            <div class="block-visual fc" style="padding: 20px 10px;">
+                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                    <div class="layer-unit" style="width: 60px;"></div>
+                                    <div class="layer-unit" style="width: 60px;"></div>
+                                    <div class="layer-unit" style="width: 60px;"></div>
+                                </div>
+                            </div>
+                            <span class="block-label">Fully Connected</span>
+                            <span class="block-size">Flatten → FC</span>
+                        </div>
+
+                        <span class="arrow">→</span>
+
+                        <div class="network-block">
+                            <div class="block-visual output-class">
+                                <div style="font-size: 2rem;">🐦</div>
+                                <div style="font-weight: bold;">Bird</div>
+                            </div>
+                            <span class="block-label">Output: 1 Label</span>
+                            <span class="block-size">[1×1000]</span>
+                        </div>
+                    </div>
+                </div>
+                <p style="text-align: center; color: #fa709a;">⚠️ Fully Connected layers "flatten" spatial information → Can only output "what the whole image is"</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🟢</span> FCN (Semantic Segmentation)</h2>
+                <div class="network-diagram">
+                    <div class="network-flow">
+                        <div class="network-block">
+                            <div class="block-visual input">
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                            </div>
+                            <span class="block-label">Input Image</span>
+                            <span class="block-size">[224×224×3]</span>
+                        </div>
+
+                        <span class="arrow">→</span>
+
+                        <div class="network-block">
+                            <div class="block-visual backbone">
+                                <div style="text-align: center; color: #fff; font-weight: bold;">
+                                    ResNet-101<br>
+                                    <small>(101 Conv Layers)</small>
+                                </div>
+                            </div>
+                            <span class="block-label">Backbone</span>
+                            <span class="block-size">Same backbone!</span>
+                        </div>
+
+                        <span class="arrow">→</span>
+
+                        <div class="network-block">
+                            <div class="block-visual conv">
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                            </div>
+                            <span class="block-label">Feature Map</span>
+                            <span class="block-size">[7×7×2048]</span>
+                        </div>
+
+                        <span class="arrow">→</span>
+
+                        <div class="network-block">
+                            <div class="block-visual output-seg" style="padding: 10px;">
+                                <div style="text-align: center; color: #fff; font-weight: bold; font-size: 0.9rem;">
+                                    1×1 Conv<br>
+                                    + Upsample
+                                </div>
+                            </div>
+                            <span class="block-label">Conv + Upsample</span>
+                            <span class="block-size">Preserves spatial!</span>
+                        </div>
+
+                        <span class="arrow">→</span>
+
+                        <div class="network-block">
+                            <div class="block-visual output-seg">
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                                <div class="layer-row">
+                                    <div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div><div class="layer-unit"></div>
+                                </div>
+                            </div>
+                            <span class="block-label">Output: Per-pixel</span>
+                            <span class="block-size">[224×224×21]</span>
+                        </div>
+                    </div>
+                </div>
+                <p style="text-align: center; color: #38ef7d;">✅ Uses 1×1 convolution instead of FC → Preserves spatial info → Every pixel gets a class!</p>
+            </div>
+
+            <div class="comparison-grid">
+                <div class="comparison-card cnn">
+                    <h3>🔴 Traditional CNN</h3>
+                    <ul class="comparison-list">
+                        <li><span class="icon">📥</span> <span>Input: One image</span></li>
+                        <li><span class="icon">⚙️</span> <span>Uses <strong>Fully Connected (FC) layers</strong> at the end</span></li>
+                        <li><span class="icon">🗜️</span> <span>"Flattens" feature maps into a 1D vector</span></li>
+                        <li><span class="icon">📤</span> <span>Output: <strong>1 class label</strong> (This image is a bird)</span></li>
+                        <li><span class="icon">❌</span> <span>Doesn't know "where the bird is in the image"</span></li>
+                    </ul>
+                </div>
+
+                <div class="comparison-card fcn">
+                    <h3>🟢 FCN (Fully Convolutional Network)</h3>
+                    <ul class="comparison-list">
+                        <li><span class="icon">📥</span> <span>Input: One image</span></li>
+                        <li><span class="icon">⚙️</span> <span>Uses <strong>1×1 Convolution layers</strong> at the end</span></li>
+                        <li><span class="icon">📐</span> <span>Preserves 2D spatial structure</span></li>
+                        <li><span class="icon">📤</span> <span>Output: <strong>Class for every pixel</strong></span></li>
+                        <li><span class="icon">✅</span> <span>Knows "what each pixel is"</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Output Difference -->
+        <div id="output" class="tab-content">
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">📊</span> Output Comparison</h2>
+                
+                <div class="output-viz">
+                    <div class="output-example">
+                        <div class="output-img original"></div>
+                        <div class="output-label">Original Image</div>
+                        <div class="output-desc">224 × 224 × 3</div>
+                    </div>
+
+                    <div class="output-example">
+                        <div class="output-img classification">
+                            <div style="font-size: 2.5rem;">🏷️</div>
+                            <div style="font-weight: bold; font-size: 1.2rem;">"Bird"</div>
+                        </div>
+                        <div class="output-label">CNN Output</div>
+                        <div class="output-desc">1 label (whole image)</div>
+                    </div>
+
+                    <div class="output-example">
+                        <div class="output-img segmentation">
+                            <div class="seg-grid" id="segGrid"></div>
+                        </div>
+                        <div class="output-label">FCN Output</div>
+                        <div class="output-desc">224 × 224 labels (per pixel)</div>
+                    </div>
+                </div>
+
+                <button class="toggle-btn" onclick="animateSegmentation()">
+                    🎨 Play Segmentation Animation
+                </button>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #000;"></div>
+                        <span>Background</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #808000;"></div>
+                        <span>Bird</span>
+                    </div>
+                </div>
+
+                <div class="key-point" style="margin-top: 30px;">
+                    <h4>🎯 The Key Difference in One Sentence</h4>
+                    <p><strong>CNN</strong>: "There's a bird in this image" → <code>[1 × 1000]</code> (probabilities for 1000 classes)</p>
+                    <p style="margin-top: 10px;"><strong>FCN</strong>: "This pixel is bird, that pixel is background..." → <code>[224 × 224 × 21]</code> (per-pixel probabilities for 21 classes)</p>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🧮</span> What's Happening Mathematically?</h2>
+                
+                <div class="comparison-grid">
+                    <div class="comparison-card cnn">
+                        <h3>CNN: Global Average Pooling + FC</h3>
+                        <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; overflow-x: auto; font-size: 0.85rem;">
+Feature Map  [7 × 7 × 2048]
+                ↓ Global Average Pooling
+Vector       [1 × 2048]
+                ↓ Fully Connected
+Output       [1 × 1000]  ← Probabilities for 1000 classes
+                        </pre>
+                    </div>
+
+                    <div class="comparison-card fcn">
+                        <h3>FCN: 1×1 Conv + Upsample</h3>
+                        <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; overflow-x: auto; font-size: 0.85rem;">
+Feature Map  [7 × 7 × 2048]
+                ↓ 1×1 Convolution (reduce channels)
+Feature Map  [7 × 7 × 21]
+                ↓ Bilinear Upsample (scale up 32×)
+Output       [224 × 224 × 21]  ← Per-pixel probs for 21 classes
+                        </pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        function switchTab(tabId) {
+            // Update buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+
+            // Initialize segmentation grid when switching to output tab
+            if (tabId === 'output') {
+                initSegGrid();
+            }
+        }
+
+        // Building toggle
+        let buildingVisible = false;
+        function toggleBuilding() {
+            buildingVisible = !buildingVisible;
+            document.getElementById('completeBuilding').classList.toggle('show', buildingVisible);
+        }
+
+        // Segmentation grid
+        function initSegGrid() {
+            const grid = document.getElementById('segGrid');
+            if (grid.children.length > 0) return; // Already initialized
+
+            // Create bird shape pattern
+            const birdPattern = [
+                [0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,1,1,0,0,0,0],
+                [0,0,0,1,1,1,1,0,0,0],
+                [0,0,1,1,1,1,1,1,0,0],
+                [0,1,1,1,1,1,1,1,1,0],
+                [0,0,1,1,1,1,1,1,0,0],
+                [0,0,0,1,1,1,1,0,0,0],
+                [0,0,0,0,1,1,0,0,0,0],
+                [0,0,0,0,1,1,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0],
+            ];
+
+            for (let i = 0; i < 10; i++) {
+                for (let j = 0; j < 10; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'seg-cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.dataset.class = birdPattern[i][j];
+                    cell.style.background = '#000'; // Start black
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        function animateSegmentation() {
+            const cells = document.querySelectorAll('.seg-cell');
+            
+            // Reset all to black
+            cells.forEach(cell => {
+                cell.style.background = '#000';
+            });
+
+            // Animate each cell with delay
+            cells.forEach((cell, index) => {
+                setTimeout(() => {
+                    const isBird = cell.dataset.class === '1';
+                    cell.style.background = isBird ? '#808000' : '#000';
+                    cell.style.transition = 'background 0.3s ease';
+                }, index * 20);
+            });
+        }
+
+        // Initialize segmentation grid on page load if output tab is active
+        document.addEventListener('DOMContentLoaded', () => {
+            initSegGrid();
+        });
+    </script>
+</body>
+</html>
